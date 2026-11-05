@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function role() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role; }
+    function admin() { return signed() && role() == 'admin'; }
+    function staff() { return signed() && role() == 'staff'; }
+    function text(value, maximum) { return value is string && value.size() > 0 && value.size() <= maximum; }
+    function profileValid(d) {
+      return d.keys().hasAll(['uid','email','displayName','studentId','hostel','roomNumber','role','createdAt','updatedAt'])
+        && d.keys().hasOnly(['uid','email','displayName','studentId','hostel','roomNumber','role','createdAt','updatedAt'])
+        && text(d.displayName,120) && text(d.studentId,120) && text(d.hostel,120) && text(d.roomNumber,120)
+        && d.email is string && d.createdAt is timestamp && d.updatedAt == request.time;
+    }
+    match /users/{uid} {
+      allow get: if signed() && (request.auth.uid == uid || admin());
+      allow list: if admin() && resource.data.role == 'staff';
+      allow create: if signed() && request.auth.uid == uid && profileValid(request.resource.data)
+        && request.resource.data.uid == uid && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'student' && request.resource.data.createdAt == request.time;
+      allow update: if signed() && request.auth.uid == uid && profileValid(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','hostel','roomNumber','updatedAt']);
+    }
+    function requestValid(d,id) {
+      return d.keys().hasAll(['id','ownerId','category','title','description','hostel','roomNumber','priority','status','photoUrl','assignedStaffId','assignedStaffName','resolutionNotes','resolvedAt','createdAt','updatedAt'])
+        && d.keys().hasOnly(['id','ownerId','category','title','description','hostel','roomNumber','priority','status','photoUrl','photoPath','assignedStaffId','assignedStaffName','resolutionNotes','resolvedAt','createdAt','updatedAt'])
+        && d.id == id && text(d.ownerId,128)
+        && d.category in ['electrical','plumbing','hvac','furniture','room','other']
+        && text(d.title,160) && text(d.description,4000) && text(d.hostel,120) && text(d.roomNumber,120)
+        && d.priority in ['Low','Medium','High'] && d.status in ['Pending','In Progress','Resolved']
+        && (d.photoUrl == null || d.photoUrl == resource.data.photoUrl)
+        && (d.get('photoPath',null) == null || (d.photoPath is string && d.photoPath.matches('requests/' + d.ownerId + '/' + id + '/[^/]+')))
+        && ((d.assignedStaffId == null && d.assignedStaffName == null) || (text(d.assignedStaffId,128) && text(d.assignedStaffName,120)))
+        && (d.status == 'Resolved' ? text(d.resolutionNotes,4000) && d.resolvedAt is timestamp : d.resolutionNotes == null && d.resolvedAt == null)
+        && d.createdAt is timestamp && d.updatedAt == request.time;
+    }
+    match /requests/{id} {
+      allow get: if signed() && !exists(/databases/$(database)/documents/requests/$(id));
+      allow read: if signed() && (resource.data.ownerId == request.auth.uid || admin() || (staff() && resource.data.assignedStaffId == request.auth.uid));
+      allow create: if signed() && role() == 'student' && requestValid(request.resource.data,id)
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.status == 'Pending'
+        && request.resource.data.photoUrl == null && request.resource.data.get('photoPath',null) == null
+        && request.resource.data.assignedStaffId == null && request.resource.data.assignedStaffName == null
+        && request.resource.data.resolutionNotes == null && request.resource.data.resolvedAt == null
+        && request.resource.data.createdAt == request.time;
+      allow update: if signed() && requestValid(request.resource.data,id)
+        && (
+          (resource.data.ownerId == request.auth.uid && role() == 'student' && resource.data.status == 'Pending'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['category','title','description','hostel','roomNumber','priority','photoPath','photoUrl','updatedAt']))
+          || (admin() && resource.data.status != 'Resolved'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedStaffId','assignedStaffName','status','resolutionNotes','resolvedAt','updatedAt'])
+            && (request.resource.data.assignedStaffId == resource.data.assignedStaffId
+              || (request.resource.data.status == 'In Progress' && get(/databases/$(database)/documents/users/$(request.resource.data.assignedStaffId)).data.role == 'staff'))
+            && transition())
+          || (staff() && resource.data.assignedStaffId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','resolutionNotes','resolvedAt','updatedAt'])
+            && transition())
+        );
+      function transition() {
+        return (resource.data.status == 'Pending' && request.resource.data.status == 'In Progress')
+          || (resource.data.status == 'In Progress' && request.resource.data.status in ['In Progress','Resolved']
+            && (request.resource.data.status != 'Resolved' || request.resource.data.resolvedAt == request.time));
+      }
+      allow delete: if signed() && role() == 'student' && resource.data.ownerId == request.auth.uid && resource.data.status == 'Pending';
+      match /history/{eventId} {
+        function parent() { return get(/databases/$(database)/documents/requests/$(id)).data; }
+        function afterParent() { return getAfter(/databases/$(database)/documents/requests/$(id)).data; }
+        allow read: if signed() && (parent().ownerId == request.auth.uid || admin() || (staff() && parent().assignedStaffId == request.auth.uid));
+        allow create: if signed()
+          && request.resource.data.keys().hasOnly(['actorId','status','action','createdAt'])
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.status == afterParent().status
+          && request.resource.data.action in ['Submitted','Updated','Assigned','Resolved','Started']
+          && (request.resource.data.action != 'Assigned' || admin())
+          && (request.resource.data.action != 'Resolved' || request.resource.data.status == 'Resolved')
+          && (request.resource.data.action != 'Submitted' || !exists(/databases/$(database)/documents/requests/$(id)))
+          && afterParent().updatedAt == request.time
+          && (afterParent().ownerId == request.auth.uid || admin() || (staff() && afterParent().assignedStaffId == request.auth.uid));
+      }
+    }
+  }
+}

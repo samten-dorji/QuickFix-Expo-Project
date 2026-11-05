@@ -1,0 +1,10 @@
+const { initializeApp, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { onCall } = require('firebase-functions/v2/https');
+const { buildProvisioning } = require('./provisioning.cjs');
+const app = getApps()[0] ?? initializeApp();
+const provisioning = buildProvisioning(getFirestore(app), getAuth(app));
+const options = { region: 'us-central1', maxInstances: 5, timeoutSeconds: 30 };
+exports.createInvitation = onCall(options, provisioning.createInvitation);
+exports.redeemInvitation = onCall(options, provisioning.redeemInvitation);

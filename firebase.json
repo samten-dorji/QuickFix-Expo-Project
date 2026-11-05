@@ -1,0 +1,40 @@
+{
+    "firestore":  {
+                      "rules":  "firestore.rules",
+                      "indexes":  "firestore.indexes.json"
+                  },
+    "storage":  {
+                    "rules":  "storage.rules"
+                },
+    "emulators":  {
+                      "firestore":  {
+                                        "port":  8080
+                                    },
+                      "storage":  {
+                                      "port":  9199
+                                  },
+                      "ui":  {
+                                 "enabled":  false
+                             },
+                      "singleProjectMode":  true,
+                      "auth":  {
+                                   "port":  9099
+                               },
+                      "functions":  {
+                                        "port":  5001
+                                    }
+                  },
+    "functions":  [
+                      {
+                          "runtime":  "nodejs22",
+                          "source":  "functions",
+                          "codebase":  "quickfix-provisioning",
+                          "ignore":  [
+                                         "node_modules",
+                                         ".git",
+                                         "test",
+                                         "*.log"
+                                     ]
+                      }
+                  ]
+}

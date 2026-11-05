@@ -1,56 +1,79 @@
-# Welcome to your Expo app 👋
+> Supabase Free photo attachments are implemented locally. Follow [SUPABASE_PHOTOS_SETUP.md](SUPABASE_PHOTOS_SETUP.md) for complete SQL, Firebase token enrollment, private bucket setup, admin revocation and complete Firestore rules. No live storage setup/deployment or physical-device photo retrieval has been verified. Older unavailable-photo descriptions below refer to the superseded Firebase Storage flow.
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> Current admin registration uses Authentication + Firestore pending profiles and manual owner approval, without Cloud Functions or billing. See [FIREBASE_ADMIN_SETUP.md](FIREBASE_ADMIN_SETUP.md) for complete rules and the exact Console role edit. Photo uploads require the Supabase configuration and enrollment documented above; see [PHOTO_STORAGE_STATUS.md](PHOTO_STORAGE_STATUS.md). Production rules/approvals have not been changed.
 
-## Get started
+# Quick Fix Project II
+Expo SDK 58 / React Native / TypeScript / Expo Router. Uses the existing Firebase client project configuration for `fixquickproject`. Source repairs and automated checks do not prove that live Firebase Console settings or device behavior are correct.
 
-1. Install dependencies
+## Start on Windows in VS Code
+1. Open `C:\Projects\QuickFixProjectII` in VS Code.
+2. Use Node.js 24 LTS and a PowerShell terminal. The test environment had Node 26; Firebase CLI dependencies warn that they support Node 20/22/24.
+3. Install the locked dependencies:
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+npm.cmd ci
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+4. The existing public Firebase client identifiers remain in `src/config/firebase.ts`. To override them, copy `.env.example` to `.env.local`, then use the exact config from the same existing Firebase web app. Never put admin credentials in EXPO_PUBLIC variables.
+5. Complete the Firebase checklist in [BLOCKERS.md](BLOCKERS.md). Do not create a replacement project.
+6. Start Expo:
 
-### Other setup steps
+```powershell
+npx.cmd expo start --clear
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Connect the phone and PC to the same network. Scan the QR code with iPhone Camera or Android Expo Go. The installed Expo Go must support SDK 58. If LAN access is blocked, check Windows Firewall and network isolation. No development build has been substituted for Expo Go.
 
-## Learn more
+## Checks
+```powershell
+npm.cmd run typecheck
+npx.cmd expo lint
+npm.cmd test
+npx.cmd expo-doctor
+npx.cmd expo install --check
+npx.cmd expo export --platform ios --platform android --output-dir dist
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Security tests require Java 21 on PATH:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```powershell
+java -version
+npm.cmd run test:rules
+```
 
-## Join the community
+This command uses only the isolated `demo-quickfix` project and clears that emulator's test data, never production collections. A portable Java runtime and verified emulator JARs were downloaded into ignored `.reference` for this repair. To reuse them on this workstation:
 
-Join our community of developers creating universal apps.
+```powershell
+$env:JAVA_HOME=(Resolve-Path '.reference/java21/jdk-21.0.13+9-jre').Path
+$env:PATH=$env:JAVA_HOME+'\bin;'+$env:PATH
+$env:FIREBASE_EMULATORS_PATH=(Resolve-Path '.reference/emulators').Path
+npm.cmd run test:rules
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Do not edit rules while the emulator is starting. The scripts do not deploy rules.
+
+## Application behavior
+- Student edits and private history hiding: see [STUDENT_EDIT_HISTORY.md](STUDENT_EDIT_HISTORY.md) for current full rules and exact publication steps. Owners edit only Pending requests with atomic history; student/admin History hides individual Finished/Rejected entries privately with confirmation and Undo/Restore. Shared requests, audit records, timestamps and operational counts are preserved. Admin navigation now includes History.
+- Students register, recover their profile, log in, report/edit/delete their own Pending requests, search/filter all five statuses and view live notes/history. Photos require the Supabase setup above.
+- Student registration creates student profiles; Admin Registration creates non-privileged pending_admin profiles, manually approved by the project owner in Console. Existing roles/data are preserved. Legacy staff accounts have no active workflow access and are never promoted automatically.
+- Administrators directly approve Pending requests, start Approved work, finish In Progress work with completion notes, or reject Pending/Approved requests with a reason. Finished/Rejected are terminal. Status and immutable history are saved atomically, without assignment. See [WORKFLOW_UPDATE.md](WORKFLOW_UPDATE.md) for complete rules and exact publishing steps.
+- The removed progress/assignment cards and all staff selectors, invitation controls, assignment summaries/filters and staff navigation are absent. Resolved records display as Finished; unknown statuses remain explicit and locked for owner review.
+- Photo uploads are currently unavailable: Firebase Storage requires Blaze, and billing is not enabled by this repair. Text-only requests remain supported. Existing `photoPath`/URL data is preserved; the retained Storage implementation uses authenticated reads and owner/request paths, but live photo access is not claimed.
+- Profile > Clean Up Unused Photos retries tracked uploads/replacements/deletions that were interrupted. It checks current request references; Storage rules reject deletion of attached evidence. Retry after restoring connectivity. Queues are scoped to the signed-in user and retained across sign-out.
+- Request history is appended with request writes. Older requests can lack history entries. Deleted parents retain inaccessible append-only history documents; any retention purge belongs in a trusted backend, not client-wide deletion.
+- One shared request listener drives screens and status notifications. Saved profiles and lists use account-scoped AsyncStorage, with stale/offline labels. Sign-out clears profile/list caches. No offline writes or queued photo uploads are promised.
+- Profile and management screens offer opt-in local status alerts. These are generated when the running app detects a status change. Closed-app remote push and background synchronization are not configured. Notification permission denial does not block in-app status updates.
+- HEIC images must be converted to JPEG/PNG/WebP before upload. Photos and timelines are not promised to be available offline after a cold restart.
+
+## Deployment
+Read [BLOCKERS.md](BLOCKERS.md) first. Only after confirming the existing project's schema and Console settings, a project administrator can run:
+
+```powershell
+npx.cmd firebase login
+npx.cmd firebase projects:list
+npx.cmd firebase deploy --project fixquickproject --only firestore:rules
+```
+
+Review the selected project before executing deployment. No new index is needed. If an existing Storage bucket is available on a supported plan, separately publish its updated rules with `npx.cmd firebase deploy --project fixquickproject --only storage` to remove legacy staff access. Uploads remain unavailable; do not enable billing for this workflow. `firebase.json` separates `firestore.rules` from `storage.rules`; the former combined `firebase.rules` is a retirement notice and must not be pasted into either Console editor. See WORKFLOW_UPDATE.md for the complete current rules.
+
+Read [TEST_REPORT.md](TEST_REPORT.md) for actual checks and [ACCEPTANCE_CHECKLIST.md](ACCEPTANCE_CHECKLIST.md) for physical-device testing. [CHANGED_FILES.md](CHANGED_FILES.md) lists repair files. A reversible checkpoint of pre-existing changes is in `.checkpoints/before-repair-20261104-204744` (tracked patch plus copies of pre-existing untracked files).

@@ -1,0 +1,4 @@
+// This former combined rules file is retired.
+// Deploy firestore.rules to Firestore and storage.rules to Storage via firebase.json.
+// Never paste Storage service declarations into the Firestore rules editor.
+// Current pending-admin approval setup and COMPLETE rules: FIREBASE_ADMIN_SETUP.md.

@@ -41,3 +41,11 @@ example
 # generated native folders
 /ios
 /android
+/.reference/
+/.checkpoints/
+
+*-debug.log
+firebase-debug.*.log
+
+# Local project-specific configuration; .env.example remains shareable.
+/.env

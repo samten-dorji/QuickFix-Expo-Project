@@ -1,0 +1,9 @@
+import { useState } from 'react';
+import { Modal, Pressable, Text, View, ScrollView } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { ui } from './Screen';
+export function Select<T extends string>({label,value,values,onChange,disabled=false}:{label:string;value:T;values:readonly T[];onChange:(value:T)=>void;disabled?:boolean}){
+ const [open,setOpen]=useState(false);
+ return <View style={{gap:8}}><Text style={[ui.body,{fontFamily:'Inter_600SemiBold',color:'#191c1e'}]}>{label}</Text><Pressable accessibilityRole="button" accessibilityLabel={label+': '+value} accessibilityState={{expanded:open,disabled}} disabled={disabled} onPress={()=>setOpen(true)} style={{minHeight:52,padding:14,borderWidth:1,borderColor:'#c4c5d5',borderRadius:12,backgroundColor:'#fff',flexDirection:'row',alignItems:'center',gap:12,justifyContent:'space-between'}}><Text style={[ui.body,{textTransform:'capitalize',flex:1,flexShrink:1}]}>{value}</Text><Feather name="chevron-down" size={22} color="#444653"/></Pressable>
+ <Modal visible={open} transparent animationType="slide" onRequestClose={()=>setOpen(false)}><View style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#0006'}}><View accessibilityViewIsModal style={{backgroundColor:'#fff',borderRadius:16,padding:20,gap:12,maxHeight:'80%'}}><Text style={ui.heading}>{label}</Text><ScrollView>{values.map(item=><Pressable key={item} accessibilityRole="button" accessibilityState={{selected:item===value}} onPress={()=>{onChange(item);setOpen(false);}} style={{paddingVertical:16,paddingHorizontal:12,borderRadius:8,backgroundColor:item===value?'#f3f4f6':'#fff',borderBottomWidth:1,borderColor:'#e7e8ea'}}><Text style={[ui.body,{textTransform:'capitalize',color:item===value?'#00288e':'#191c1e'}]}>{item}</Text></Pressable>)}</ScrollView><Pressable accessibilityRole="button" onPress={()=>setOpen(false)}><Text style={ui.link}>Cancel</Text></Pressable></View></View></Modal></View>;
+}

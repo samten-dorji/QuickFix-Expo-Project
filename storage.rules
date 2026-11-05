@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signed() { return request.auth != null; }
+    // Both legacy and new privileged profiles use their backend-controlled role.
+    function profile() { return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data; }
+    function requestExists(id) { return firestore.exists(/databases/(default)/documents/requests/$(id)); }
+    function issue(id) { return firestore.get(/databases/(default)/documents/requests/$(id)).data; }
+    match /requests/{ownerId}/{requestId}/{fileName} {
+      allow read: if signed() && requestExists(requestId) && issue(requestId).ownerId == ownerId
+        && (request.auth.uid == ownerId || profile().role == 'admin');
+      allow create: if resource == null && signed() && request.auth.uid == ownerId && profile().role == 'student'
+        && requestExists(requestId) && issue(requestId).ownerId == ownerId && issue(requestId).status == 'Pending'
+        && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg','image/png','image/webp']
+        && request.resource.metadata.ownerId == ownerId && request.resource.metadata.requestId == requestId;
+      allow delete: if signed() && request.auth.uid == ownerId && (!requestExists(requestId) || (issue(requestId).ownerId == ownerId && issue(requestId).get('photoPath', '') != 'requests/' + ownerId + '/' + requestId + '/' + fileName));
+    }
+  }
+}
